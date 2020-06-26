@@ -1,0 +1,189 @@
+# Copyright (C) 2020 Artur Bogusławski, e-mail: artur.boguslawski@ibnet.pl
+
+# saver comes with NO WARRANTY. This program is completely free and you can
+# redistribute it under the GNU General Public License conditions.
+# See https://www.gnu.org/licenses/gpl-3.0.txt for more information
+
+# saver was made to simplify the process of backuping using rsync.
+
+# version 1.1
+
+#!/bin/bash
+
+if [[ ! -e /usr/bin/saver ]]; then
+    localdirectory=`dirname $0`
+    sudo mv $localdirectory/saver-installer /usr/bin/saver
+    echo "Installing the program..."
+    exit
+fi
+
+
+if ! [ $(command -v rsync) ]; then # checking if user has rsync installed
+    echo "In order for this program to work, rsync must be installed"
+    exit
+fi
+
+sudo echo | grep -q a
+
+for ((i=1; i<=5; i++)); do
+    case ${!i} in
+        \-*)
+            if [[ "${!i}" == *b* ]]; then
+                option=backup
+            fi
+
+            if [[ "${!i}" == *h* ]]; then
+                option=help
+            fi
+
+            if [[ "${!i}" == *d* ]]; then
+                rsyncoptions=(${rsyncoptions}-n )
+            fi
+
+            if [[ "${!i}" == *r* ]]; then
+                rsyncoptions=(${rsyncoptions}--delete )
+            fi
+
+            if [[ "${!i}" == *p* ]]; then
+                rsyncoptions=(${rsyncoptions}--progress )
+            fi
+
+            if [[ "${!i}" == *v* ]]; then
+                rsyncoptions=(${rsyncoptions}--v )
+            fi
+
+            if [[ "${!i}" == *s* ]]; then
+                option=show
+            fi
+
+            if [[ "${!i}" == *u* ]]; then
+                option=uninstall
+            fi
+        ;;
+
+        /*)
+            if [[ -z $bp ]]; then
+                bp="${!i}"
+            else
+                tp="${!i}"
+            fi
+        ;;
+
+        *)
+            if [[ -b /dev/${!i} ]]; then
+                if [[ -z $bp ]]; then
+                    bdp="/dev/${!i}"
+                else
+                    tdp="/dev/${!i}"
+                fi
+            fi
+        ;;
+    esac
+done
+
+case $option in
+    backup)
+        if [[ ! -e $bp ]]; then
+            echo -e "The path to sync from wasn't provided or doesn't exist\nType in 'saver -h' to see the list of commands"
+            exit
+        fi
+
+        if [[ -z $tp ]]; then
+            echo -e "The target path wasn't provided\nType in 'saver -h' to see the list of commands"
+            exit
+        fi
+
+        fbp=$bp
+        ftp=$tp
+
+        if [[ ! -z $bdp ]]; then
+            sudo umount $bdp | grep -q a
+            echo "Unmounting the disk to sync from"
+
+            sudo mkdir /mnt/saverbd | grep -q a
+            echo "Creating /mnt/saverbd"
+
+            sudo mount  $bdp /mnt/saverbd
+            echo "Mounting the disk to sync from to /mnt/saverbd"
+
+            fbp=/mnt/saverbd${bp}
+        fi
+
+        if [[ ! -z $tdp ]]; then
+            sudo umount $tdp | grep -q a
+            echo "Unmounting the target disk"
+
+            sudo mkdir /mnt/savertd | grep -q a
+            echo "Creating /mnt/savertd"
+
+            sudo mount $tdp /mnt/savertd
+            echo "Mounting the target disk to /mnt/savertd"
+
+            ftp=/mnt/savertd${tp}
+        fi
+
+        if [[ ! -e $tp ]]; then
+            mkdir -p $ftp
+            echo "Creating ${ftp}"
+        fi
+      
+        sudo rsync -aAX "${rsyncoptions[@]}" $fbp --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} $ftp
+
+        if [[ ! -z $bdp ]]; then
+            sudo umount $bdp | grep -q a
+            echo -e "\nUnmounting the target disk"
+
+            sudo rm -rf /mnt/saverbd
+            echo "Deleting /mnt/saverbd"
+        fi
+
+        if [[ ! -z $tdp ]]; then
+            sudo umount $tdp | grep -q a
+            echo -e "\nUnmounting the target disk"
+
+            sudo rm -rf /mnt/savertd 
+            echo "Deleting /mnt/savertd"
+        fi
+    ;;
+
+    show)
+        lsblk -o NAME,SIZE,MOUNTPOINT | tail -n +2
+    ;;
+
+    help)
+        echo -e "\n Copyright (C) 2020 Artur Bogusławski, e-mail: artur.boguslawski@ibnet.pl"
+        echo -e "\n Version 1.1"
+        echo -e "\n saver comes with NO WARRANTY. This program is completely free and you can\n redistribute it under the GNU General Public License conditions.\n See https://www.gnu.org/licenses/gpl-3.0.txt for more information"
+        echo -e "\n saver was made to simplify the process of backuping using rsync."
+        echo -e "\n\n This program will automaticly exclude these directories from\n syncing: /dev ; /proc ; /sys ; /tmp ; /run ; /mnt ; /media ; /lost+found.\n You should type in ONLY the name of a disk WITHOUT '/dev/' at the beginning.\n The program will add it automatically for you. Any external disk you\n mention will be unmounted at the end of the program."
+        echo -e "\n Options:"
+        echo -e "\n -b     Sync folders. Usage: saver -b (disk to sync from, empty for current disk)\n        (path to sync from) (target disk, empty for current disk) (target path)" 
+        echo -e " -r     Remove files from the target directory which aren't present in the path\n        you're syncing from"
+        echo -e " -d     Preform a 'dry run', which means that nothing is really going to happen,\n        but you'd be able to see which files would've been synced"
+        echo -e " -p     Display progress for individual files (useful for large files)"
+        echo -e " -v     Display files that are being processed"
+        echo -e " -s     Show available disks/partitions"
+        echo -e " -u     Uninstall this program"
+        echo -e " -h     Show this help"
+        echo
+    ;;
+
+    uninstall)
+        echo -n "Are you sure you want to uninstall this program? (y/n): "
+        read -n 1 uq
+        echo
+
+        if [[ $uq == y ]]; then
+            sudo rm -rf /usr/bin/saver
+            echo "Uninstalling the program..."
+            exit
+        else
+            exit
+        fi 
+    ;;
+
+    *)
+        echo -e "Invalid option provided\nType in 'saver -h' to see the list of commands"
+    ;;
+esac
+
