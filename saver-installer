@@ -10,7 +10,7 @@
 
 #!/bin/bash
 
-if [[ ! -e /usr/bin/saver ]]; then
+if [[ ! -e /usr/bin/saver ]]; then # installing the program if run for the first time
     localdirectory=`dirname $0`
     sudo mv $localdirectory/saver-installer /usr/bin/saver
     echo "Installing the program..."
@@ -23,13 +23,13 @@ if ! [ $(command -v rsync) ]; then # checking if user has rsync installed
     exit
 fi
 
-sudo echo | grep -q a
+sudo echo | grep -q a # just a sudo command to let the rest of the program run smothly as root
 
-for ((i=1; i<=5; i++)); do
+for ((i=1; i<=5; i++)); do # here input variables of the script are read one by another using the for loop
     case ${!i} in
-        \-*)
+        \-*) # this is where all the '-' options are
             if [[ "${!i}" == *b* ]]; then
-                option=backup
+                option=backup # some options tell the program what to do next
             fi
 
             if [[ "${!i}" == *h* ]]; then
@@ -37,7 +37,7 @@ for ((i=1; i<=5; i++)); do
             fi
 
             if [[ "${!i}" == *d* ]]; then
-                rsyncoptions=(${rsyncoptions}-n )
+                rsyncoptions=(${rsyncoptions}-n ) # the next 4 options add an option to the rsync command later on
             fi
 
             if [[ "${!i}" == *r* ]]; then
@@ -61,7 +61,7 @@ for ((i=1; i<=5; i++)); do
             fi
         ;;
 
-        /*)
+        /*) # here the paths and disks are set
             if [[ -z $bp ]]; then
                 bp="${!i}"
             else
@@ -82,35 +82,35 @@ for ((i=1; i<=5; i++)); do
 done
 
 case $option in
-    backup)
-        if [[ ! -e $bp ]]; then
-            echo -e "The path to sync from wasn't provided or doesn't exist\nType in 'saver -h' to see the list of commands"
+    backup) # the -b option
+        if [[ ! -e $bp ]]; then # checking if the path to sync from exists
+            echo -e "The path to sync wasn't provided or doesn't exist\nType in 'saver -h' to see the list of commands"
             exit
         fi
 
-        if [[ -z $tp ]]; then
+        if [[ -z $tp ]]; then # checking if the target path isn't empty
             echo -e "The target path wasn't provided\nType in 'saver -h' to see the list of commands"
             exit
         fi
 
-        fbp=$bp
+        fsp=$bp # these stand for the final paths that will be put to the rsync command (final sync path / final target path)
         ftp=$tp
 
         if [[ ! -z $bdp ]]; then
-            sudo umount $bdp | grep -q a
+            sudo umount $bdp | grep -q a # mounting the sync external disk to a folder that's made
             echo "Unmounting the disk to sync from"
 
             sudo mkdir /mnt/saverbd | grep -q a
             echo "Creating /mnt/saverbd"
 
-            sudo mount  $bdp /mnt/saverbd
-            echo "Mounting the disk to sync from to /mnt/saverbd"
+            sudo mount  $bdp /mnt/saverbd 
+            echo "Mounting the disk to sync to /mnt/saverbd"
 
-            fbp=/mnt/saverbd${bp}
+            fsp=/mnt/saverbd${bp} # updates the final path if it's from an external disk
         fi
 
         if [[ ! -z $tdp ]]; then
-            sudo umount $tdp | grep -q a
+            sudo umount $tdp | grep -q a # mounting the target external disk to a folder that's made
             echo "Unmounting the target disk"
 
             sudo mkdir /mnt/savertd | grep -q a
@@ -119,7 +119,7 @@ case $option in
             sudo mount $tdp /mnt/savertd
             echo "Mounting the target disk to /mnt/savertd"
 
-            ftp=/mnt/savertd${tp}
+            ftp=/mnt/savertd${tp} # updates the final path if it's from an external disk
         fi
 
         if [[ ! -e $tp ]]; then
@@ -127,17 +127,17 @@ case $option in
             echo "Creating ${ftp}"
         fi
       
-        sudo rsync -aAX "${rsyncoptions[@]}" $fbp --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} $ftp
+        sudo rsync -aAX "${rsyncoptions[@]}" $fsp --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} $ftp
 
-        if [[ ! -z $bdp ]]; then
+        if [[ ! -z $bdp ]]; then # unmounting the sync external disk and deleting the mount folder
             sudo umount $bdp | grep -q a
-            echo -e "\nUnmounting the target disk"
+            echo -e "\nUnmounting the synced disk"
 
             sudo rm -rf /mnt/saverbd
             echo "Deleting /mnt/saverbd"
         fi
 
-        if [[ ! -z $tdp ]]; then
+        if [[ ! -z $tdp ]]; then # unmounting the target external disk and deleting the mount folder
             sudo umount $tdp | grep -q a
             echo -e "\nUnmounting the target disk"
 
@@ -147,18 +147,18 @@ case $option in
     ;;
 
     show)
-        lsblk -o NAME,SIZE,MOUNTPOINT | tail -n +2
+        lsblk -o NAME,SIZE,MOUNTPOINT | tail -n +2 # shows the available disks and partitions
     ;;
 
-    help)
+    help) # the help page
         echo -e "\n Copyright (C) 2020 Artur Bogusławski, e-mail: artur.boguslawski@ibnet.pl"
         echo -e "\n Version 1.1"
         echo -e "\n saver comes with NO WARRANTY. This program is completely free and you can\n redistribute it under the GNU General Public License conditions.\n See https://www.gnu.org/licenses/gpl-3.0.txt for more information"
         echo -e "\n saver was made to simplify the process of backuping using rsync."
         echo -e "\n\n This program will automaticly exclude these directories from\n syncing: /dev ; /proc ; /sys ; /tmp ; /run ; /mnt ; /media ; /lost+found.\n You should type in ONLY the name of a disk WITHOUT '/dev/' at the beginning.\n The program will add it automatically for you. Any external disk you\n mention will be unmounted at the end of the program."
         echo -e "\n Options:"
-        echo -e "\n -b     Sync folders. Usage: saver -b (disk to sync from, empty for current disk)\n        (path to sync from) (target disk, empty for current disk) (target path)" 
-        echo -e " -r     Remove files from the target directory which aren't present in the path\n        you're syncing from"
+        echo -e "\n -b     Sync folders. Usage: saver -b (disk to sync , empty for current disk)\n        (path to sync from) (target disk, empty for current disk) (target path)" 
+        echo -e " -r     Remove files from the target directory which aren't present in the sync path\n        you're syncing from"
         echo -e " -d     Preform a 'dry run', which means that nothing is really going to happen,\n        but you'd be able to see which files would've been synced"
         echo -e " -p     Display progress for individual files (useful for large files)"
         echo -e " -v     Display files that are being processed"
@@ -168,7 +168,7 @@ case $option in
         echo
     ;;
 
-    uninstall)
+    uninstall) # uninstall section
         echo -n "Are you sure you want to uninstall this program? (y/n): "
         read -n 1 uq
         echo
@@ -182,7 +182,7 @@ case $option in
         fi 
     ;;
 
-    *)
+    *) # in case no valid option is provided
         echo -e "Invalid option provided\nType in 'saver -h' to see the list of commands"
     ;;
 esac
