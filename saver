@@ -8,13 +8,13 @@
 
 # saver was made to simplify the process of backuping using rsync.
 
-# version 2.2-1
+# version 2.3-1
 
-if [[ ! $(id -u) == 0 ]]; then # making sure the progream is executed as root
+if [[ $(id -u) != 0 ]]; then # making sure the progream is executed as root
     exec sudo $0 "$@"
 fi
 
-for ((i=1; i=i; i++));  do # here input variables of the script are read one by another using the for loop
+for ((i=1; i <= $#; i++));  do # here input variables of the script are read one by another using the for loop
     [[ -z ${!i} ]] && break
     case ${!i} in
         \-*) # this is where all the '-' options are
@@ -79,7 +79,7 @@ case $option in
             umount -q $sdp # mounting the sync external disk to a folder that's made
             
             echo "Creating /mnt/saverbd"
-            mkdir /mnt/saverbd | grep -q a
+            mkdir -p /mnt/saverbd
             
             echo -e "Mounting the disk to copy to /mnt/saverbd\n"
             mount $sdp /mnt/saverbd 
@@ -92,7 +92,7 @@ case $option in
             umount -q $tdp # mounting the target external disk to a folder that's made
 
             echo "Creating /mnt/savertd"
-            mkdir /mnt/savertd | grep -q a
+            mkdir -p /mnt/savertd
 
             echo -e "Mounting the target disk to /mnt/savertd\n"
             mount $tdp /mnt/savertd
@@ -102,7 +102,7 @@ case $option in
 
         if [[ ! -e $tp ]]; then
             echo "Creating ${ftp}"
-            mkdir -p $ftp | grep -q a 
+            mkdir -p $ftp 
         fi
 
         echo
@@ -132,23 +132,39 @@ case $option in
     ;;
 
     help) # the help page
-        echo -e "\n Copyright (C) 2020 Artur Boguslawski, e-mail: artur.boguslawski@ibnet.pl
- Version 2.2-1
-\n saver comes with NO WARRANTY. This program is completely free and you\n can redistribute it under the GNU General Public License conditions.\n See https://www.gnu.org/licenses/gpl-3.0.txt for more information
-\n saver was made to simplify the process of backuping using rsync.
-\n This program will automaticly exclude these directories from syncing:\n /dev ; /proc ; /sys ; /tmp ; /run ; /mnt ; /media ; /lost+found.
- When typing in the disk name, you can use the full '/dev/(disk)' or just\n provide the name of the disk.
+        cat <<EOF
+
+ Copyright (C) 2020 Artur Boguslawski, e-mail: artur.boguslawski@ibnet.pl
+ Version 2.3-1
+
+ saver comes with NO WARRANTY. This program is completely free and you
+ can redistribute it under the GNU General Public License conditions.
+ See https://www.gnu.org/licenses/gpl-3.0.txt for more information.
+
+ saver was made to simplify the process of backuping using rsync.
+
+ This program will automaticly exclude these directories from syncing:
+ /dev ; /proc ; /sys ; /tmp ; /run ; /mnt ; /media ; /lost+found.
+ When typing in the disk name, you can use the full '/dev/(disk)' or just
+ provide the name of the disk.
  Any disk you mention will be unmounted at the end of the program.
-\n Usage:
-\n -s [disk to copy (empty for current disk)] [copied path]\n    [target disk (empty for current disk)] [target path]
-\n Options:
-\n -s     Sync folders
+ 
+ Usage:
+
+ -s [disk to copy (empty for current disk)] [copied path]
+    [target disk (empty for current disk)] [target path]
+ 
+ Options:
+
+ -s     Sync folders
  -r     Delete any other files in the target folder
  -d     Preform a 'dry run', no changes will be made
  -p     Display progress for individual files (useful for large files)
  -v     Display files that are being processed
  -i     Show available disks/partitions
- -h     Show this help\n"
+ -h     Show this help
+
+EOF
     ;;
 
     *) # in case no valid option is provided
