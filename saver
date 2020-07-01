@@ -1,0 +1,158 @@
+#!/bin/bash
+
+# Copyright (C) 2020 Artur Boguslawski, e-mail: artur.boguslawski@ibnet.pl
+
+# saver comes with NO WARRANTY. This program is completely free and you can
+# redistribute it under the GNU General Public License conditions.
+# See https://www.gnu.org/licenses/gpl-3.0.txt for more information
+
+# saver was made to simplify the process of backuping using rsync.
+
+# version 2.2-1
+
+if [[ ! $(id -u) == 0 ]]; then # making sure the progream is executed as root
+    exec sudo $0 "$@"
+fi
+
+for ((i=1; i=i; i++));  do # here input variables of the script are read one by another using the for loop
+    [[ -z ${!i} ]] && break
+    case ${!i} in
+        \-*) # this is where all the '-' options are
+            case ${!i} in
+                *s*) option=$option"sync" ;;&  
+                *d*) rsyncoptions+=(-n) ;;& 
+                *r*) rsyncoptions+=(--delete) ;;&
+                *p*) rsyncoptions+=(--progress) ;;&
+                *v*) rsyncoptions+=(-v) ;;&
+                *h*) option=$option"help" ;;&
+                *i*) option=$option"diskinfo" ;;
+            esac
+        ;;
+
+        *) # here the paths and disks are set
+            if [[ -b ${!i} ]]; then
+                if [[ -z $sp ]]; then
+                    sdp="${!i}"
+                else
+                    tdp="${!i}"
+                fi
+            else
+                if [[ -b /dev/${!i} ]]; then
+                    if [[ -z $sp ]]; then
+                        sdp="/dev/${!i}" # sdp = sync disk path
+                    else
+                        tdp="/dev/${!i}" # tdp = target disk path
+                    fi
+                else
+                    if [[ ${!i} == /* ]]; then    
+                        if [[ -z $sp ]]; then
+                            sp="${!i}" # sp = sync path
+                        else
+                            tp="${!i}" # tp = target path
+                        fi
+                    fi
+                fi
+            fi
+        ;;
+    esac
+done
+
+case $option in
+    sync) # the -s option
+        if [[ ! -e $sp ]]; then # checking if the path to sync from exists
+            echo -e "The path to copy wasn't provided or doesn't exist\nType in 'saver -h' to see the list of commands"
+            logger "saver: The path to copy wasn't provided or doesn't exist"
+            exit
+        fi
+
+        if [[ -z $tp ]]; then # checking if the target path isn't empty
+            echo -e "The target path wasn't provided\nType in 'saver -h' to see the list of commands"
+            logger "saver: The target path wasn't provided"
+            exit
+        fi
+
+        fsp=$sp # these stand for the final paths that will be put to the rsync command (final sync path / final target path)
+        ftp=$tp
+
+        if [[ $sdp ]]; then 
+            echo "Unmounting the disk to copy"
+            umount -q $sdp # mounting the sync external disk to a folder that's made
+            
+            echo "Creating /mnt/saverbd"
+            mkdir /mnt/saverbd | grep -q a
+            
+            echo -e "Mounting the disk to copy to /mnt/saverbd\n"
+            mount $sdp /mnt/saverbd 
+            
+            fsp=/mnt/saverbd${sp} # updates the final path if it's from an external disk
+        fi
+
+        if [[ $tdp ]]; then
+            echo "Unmounting the target disk"
+            umount -q $tdp # mounting the target external disk to a folder that's made
+
+            echo "Creating /mnt/savertd"
+            mkdir /mnt/savertd | grep -q a
+
+            echo -e "Mounting the target disk to /mnt/savertd\n"
+            mount $tdp /mnt/savertd
+
+            ftp=/mnt/savertd${tp} # updates the final path if it's from an external disk
+        fi
+
+        if [[ ! -e $tp ]]; then
+            echo "Creating ${ftp}"
+            mkdir -p $ftp | grep -q a 
+        fi
+
+        echo
+
+        rsync -aAX "${rsyncoptions[@]}" $fsp --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} $ftp
+
+        if [[ $sdp ]]; then # unmounting the sync external disk and deleting the mount folder
+            echo -e "\nUnmounting the copied disk"
+            umount -q $sdp
+
+            echo -e "Deleting /mnt/saverbd\n"
+            rm -rf /mnt/saverbd
+        fi
+
+        if [[ $tdp ]]; then # unmounting the target external disk and deleting the mount folder
+            echo -e "\nUnmounting the target disk"
+            umount -q $tdp
+            
+            echo -e "Deleting /mnt/savertd\n"
+            rm -rf /mnt/savertd 
+            
+        fi
+    ;;
+
+    diskinfo)
+        lsblk -o NAME,SIZE,MOUNTPOINT,FSTYPE # shows the available disks and partitions
+    ;;
+
+    help) # the help page
+        echo -e "\n Copyright (C) 2020 Artur Boguslawski, e-mail: artur.boguslawski@ibnet.pl
+ Version 2.2-1
+\n saver comes with NO WARRANTY. This program is completely free and you\n can redistribute it under the GNU General Public License conditions.\n See https://www.gnu.org/licenses/gpl-3.0.txt for more information
+\n saver was made to simplify the process of backuping using rsync.
+\n This program will automaticly exclude these directories from syncing:\n /dev ; /proc ; /sys ; /tmp ; /run ; /mnt ; /media ; /lost+found.
+ When typing in the disk name, you can use the full '/dev/(disk)' or just\n provide the name of the disk.
+ Any disk you mention will be unmounted at the end of the program.
+\n Usage:
+\n -s [disk to copy (empty for current disk)] [copied path]\n    [target disk (empty for current disk)] [target path]
+\n Options:
+\n -s     Sync folders
+ -r     Delete any other files in the target folder
+ -d     Preform a 'dry run', no changes will be made
+ -p     Display progress for individual files (useful for large files)
+ -v     Display files that are being processed
+ -i     Show available disks/partitions
+ -h     Show this help\n"
+    ;;
+
+    *) # in case no valid option is provided
+        echo -e "Invalid option provided\nType in 'saver -h' to see the list of commands"
+        logger saver: "Invalid option provided" 
+    ;;
+esac
