@@ -15,7 +15,6 @@ if [[ $(id -u) != 0 ]]; then # making sure the progream is executed as root
 fi
 
 for ((i=1; i <= $#; i++));  do # here input variables of the script are read one by another using the for loop
-    [[ -z ${!i} ]] && break
     case ${!i} in
         \-*) # this is where all the '-' options are
             case ${!i} in
